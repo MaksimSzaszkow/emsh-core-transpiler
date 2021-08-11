@@ -1,6 +1,7 @@
 import EmshFunction from "./EmshFunction";
 
 export default class EmshClass {
+  type = "class";
   name;
   public = new EmshClassContent();
   private = new EmshClassContent();
@@ -21,16 +22,6 @@ export default class EmshClass {
   createVariable() {}
 
   removeVariable() {}
-
-  toEco() {
-    return {
-      type: "class",
-      name: this.name,
-      public: this.public,
-      private: this.private,
-      static: this.static,
-    };
-  }
 }
 
 export class EmshClassContent {
@@ -38,4 +29,4 @@ export class EmshClassContent {
   variables = [];
 }
 
-type ClassScope = "private" | "public" | "static";
+export type ClassScope = "private" | "public" | "static";

@@ -1,4 +1,4 @@
 module Main:
-    public:
-        class TestClass:
-        
+    class TestClass:
+    
+    function test()

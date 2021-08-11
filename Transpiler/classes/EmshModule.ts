@@ -2,7 +2,8 @@ import EmshClass from "./EmshClass";
 import EmshFunction from "./EmshFunction";
 
 export default class EmshModule {
-  name = "";
+  type = "module";
+  name;
   public = new EmshModuleContent();
   private = new EmshModuleContent();
 
@@ -31,12 +32,12 @@ export default class EmshModule {
   removeVariable() {}
 
   toEco() {
-    return {
+    return JSON.stringify({
       type: "module",
       name: this.name,
       public: this.public,
       private: this.private,
-    };
+    });
   }
 }
 
@@ -46,4 +47,4 @@ export class EmshModuleContent {
   variables = [];
 }
 
-type ModuleScope = "public" | "private";
+export type ModuleScope = "public" | "private";

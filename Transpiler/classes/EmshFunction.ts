@@ -1,4 +1,5 @@
 export default class EmshFunction {
+  type = "function";
   name;
   params: any[] = [];
   body: any[] = [];

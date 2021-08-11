@@ -1,18 +1,23 @@
-import { open, readdir, stat, rm, mkdir, access, writeFile } from "fs/promises";
+import {
+  readdir,
+  stat,
+  rm,
+  mkdir,
+  access,
+  writeFile,
+  readFile,
+} from "fs/promises";
 import { constants } from "fs";
+import { CoreTranspiler } from "./Transpiler";
 
 async function main() {
   try {
-    // If root folder was given as argument
     if (process.argv.length === 3) {
-      // If eco folder exists remove it for cleanup reasons.
-      // Not optimal but sufficient for first emsh version
       try {
         await access("eco", constants.R_OK | constants.W_OK);
         await rm("eco", { recursive: true });
       } catch (err) {}
 
-      // Start processing project structure
       processFolder(process.argv[2]);
     } else throw new Error("No root folder was passed as argument");
   } catch (err) {
@@ -21,39 +26,36 @@ async function main() {
 }
 
 async function processFolder(path: string) {
-  // For each folder create it's eco counterpart
   await mkdir(generateEcoPath(path));
+  const folderContents = await readdir(path);
 
-  // Get root folder contents and process them
-  const contents = await readdir(path);
-  contents.forEach(async (c) => {
-    c = `${path}/${c}`;
-    const stats = await stat(c);
-    if (stats.isDirectory()) processFolder(c);
-    else if (stats.isFile() && c.endsWith(".emsh")) processEmshFile(c);
+  folderContents.forEach(async (fileOrDir) => {
+    const fileOrDirPath = `${path}/${fileOrDir}`;
+    const stats = await stat(fileOrDirPath);
+    if (stats.isDirectory()) processFolder(fileOrDirPath);
+    else if (stats.isFile() && fileOrDirPath.endsWith(".emsh"))
+      processFile(fileOrDirPath, fileOrDir);
   });
 }
 
-async function processEmshFile(path: string) {
-  let filehandle;
+async function processFile(path: string, name: string) {
   try {
-    filehandle = await open(path, "r");
-    const content = await filehandle.read();
-    await writeFile(generateEcoPath(path), content.buffer);
+    const code = await readFile(path);
+    const ECO = CoreTranspiler.processFile(
+      code.toString(),
+      name.replace(".emsh", "")
+    );
+    await writeFile(generateEcoPath(path), JSON.stringify(ECO));
   } catch (err) {
-    console.log(`Error while accessing path "${path}": ${err}`);
-  } finally {
-    await filehandle?.close();
+    console.log(err);
   }
 }
 
 function generateEcoPath(path: string) {
-  if (path.endsWith(".emsh")) path = path.replace(/.emsh$/, ".eco");
+  if (path.endsWith(".emsh")) path = path.replace(/.emsh$/, ".json");
   const pathArr = path.split("/");
   pathArr[0] = "eco";
   return pathArr.join("/");
 }
-
-function createEcoFromEmsh(emsh: string) {}
 
 main();
