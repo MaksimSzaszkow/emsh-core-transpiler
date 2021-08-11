@@ -21,13 +21,9 @@ export default class EmshFile {
       this.exports.push(module);
   }
 
-  createModule(name: string) {
-    const module = this.contains.find((mod) => mod.name === name);
-    if (!module) {
-      const newModule = new EmshModule(name);
-      this.contains.push(newModule);
-      return newModule;
-    } else return module;
+  addModule(module: EmshModule) {
+    if (this.contains.findIndex((mod) => mod.name === module.name) === -1)
+      this.contains.push(module);
   }
 
   removeImport(module: EmshModule) {

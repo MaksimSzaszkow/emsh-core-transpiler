@@ -11,10 +11,9 @@ export default class EmshModule {
     this.name = name;
   }
 
-  createClass(scope: ModuleScope, name: string) {
-    const newClass = new EmshClass(name);
-    this[scope].classes.push(newClass);
-    return newClass;
+  addClass(scope: ModuleScope, emshClass: EmshClass) {
+    if (!this[scope].classes.find((c) => c.name === emshClass.name))
+      this[scope].classes.push(emshClass);
   }
 
   removeClass(scope: ModuleScope, name: string) {}

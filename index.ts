@@ -9,6 +9,7 @@ import {
 } from "fs/promises";
 import { constants } from "fs";
 import { CoreTranspiler } from "./Transpiler";
+import { exit } from "process";
 
 async function main() {
   try {
@@ -41,13 +42,14 @@ async function processFolder(path: string) {
 async function processFile(path: string, name: string) {
   try {
     const code = await readFile(path);
-    const ECO = CoreTranspiler.processFile(
+    const ECO = CoreTranspiler.transpile(
       code.toString(),
       name.replace(".emsh", "")
     );
     await writeFile(generateEcoPath(path), JSON.stringify(ECO));
   } catch (err) {
     console.log(err);
+    exit();
   }
 }
 

@@ -6,6 +6,7 @@ import EmshModule from "./classes/EmshModule";
 export class CoreTranspiler {
   static code: string[];
   static eco: EmshFile;
+  static currentName: string;
   static currentIndex = 0;
   static currentDepth = 0;
   static currentObject:
@@ -16,30 +17,46 @@ export class CoreTranspiler {
     | undefined;
   static validName = "[a-zA-Z_][a-zA-Z_0-9]*";
 
-  static processFile(code: string, name: string) {
-    const file = new EmshFile(name);
-    this.eco = this.currentObject = file;
+  static transpile(code: string, fileName: string) {
     this.code = code.split("\n");
     this.currentIndex = 0;
     this.currentDepth = 0;
+    this.currentName = fileName;
+
+    this.processFile(fileName);
+  }
+
+  static processFile(name: string) {
+    const file = new EmshFile(name);
+    this.eco = this.currentObject = file;
 
     while (this.currentIndex < this.code.length) {
       this.currentObject = file;
       const line = this.code[this.currentIndex].trim();
       const depth = this.getLineDepth(this.code[this.currentIndex]);
-      if (this.isImport(line, depth)) continue;
-      if (this.isModule(line, depth)) continue;
+
+      if (line !== "") {
+        if (depth !== 0)
+          throw new Error(
+            `Syntax error at line ${this.currentIndex + 1} in ${
+              this.currentName
+            }: file level must be equal to 0 (no indentation)`
+          );
+
+        if (this.isImport(line, depth)) continue;
+        if (this.isModule(line, depth)) continue;
+        throw new Error(
+          `Syntax error at line ${this.currentIndex + 1} in ${
+            this.currentName
+          }: line "${line}" couldn't be processed by CoreTranspiler.processFile`
+        );
+      }
     }
 
     return this.eco;
   }
 
   static isImport(line: string, depth: number) {
-    if (depth !== 0)
-      throw new Error(
-        `Syntax error at line ${line}: import statement can only be defined at file level`
-      );
-
     const fileImport = new RegExp(`^import ".*" as ${this.validName}$`);
     const moduleImport = new RegExp(`^from ".*" import ${this.validName}$`);
 
@@ -58,26 +75,30 @@ export class CoreTranspiler {
     if (type === "file") {
     } else {
     }
+    this.currentIndex++;
+    this.currentDepth = this.getLineDepth(this.code[this.currentIndex]);
   }
 
   static isModule(line: string, depth: number) {
-    if (depth !== 0)
-      throw new Error(
-        `Syntax error at line ${line}: modules can only be defined at file level`
-      );
-
     const module = new RegExp(`^module ${this.validName}:$`);
+    const nameMatch = line.match(new RegExp(`${this.validName}:$`));
 
-    if (module.test(line)) {
-      this.processModule();
+    if (module.test(line) && nameMatch) {
+      const name = nameMatch[0].replace(":", "");
+      this.currentDepth = depth;
+      this.processModule(name);
       return true;
     }
 
     return false;
   }
 
-  static processModule() {
-    const module = new EmshModule("");
+  static processModule(name: string) {
+    const module = new EmshModule(name);
+    if (this.currentObject instanceof EmshFile)
+      this.currentObject.addModule(module);
+    this.currentIndex++;
+    this.currentDepth = this.getLineDepth(this.code[this.currentIndex]);
 
     while (this.currentIndex < this.code.length) {
       this.currentObject = module;
@@ -85,39 +106,47 @@ export class CoreTranspiler {
       const line = this.code[this.currentIndex].trim();
       const depth = this.getLineDepth(this.code[this.currentIndex]);
 
-      if (depth < this.currentDepth) break;
-
-      if (this.isClass(line, depth)) continue;
-      if (this.isFunction(line, depth)) continue;
-      if (this.isVariable(line, depth)) continue;
+      if (line !== "") {
+        if (this.isClass(line, depth)) continue;
+        if (this.isFunction(line, depth)) continue;
+        if (this.isVariable(line, depth)) continue;
+        throw new Error(
+          `Syntax error at line ${this.currentIndex + 1} in ${
+            this.currentName
+          }: line "${line}" couldn't be processed by CoreTranspiler.processModule`
+        );
+      }
     }
   }
 
   static isClass(line: string, depth: number) {
-    if (depth !== 1)
-      throw new Error(
-        `Syntax error at line ${line}: classes can only be defined at module level`
-      );
-
     const publicClass = new RegExp(`^public class ${this.validName}:$`);
     const privateClass = new RegExp(
       `(^private class ${this.validName}:$)|(^class ${this.validName}:$)`
     );
+    const nameMatch = line.match(`${this.validName}:`);
 
-    if (publicClass.test(line)) {
-      this.processClass("public");
-      return true;
-    }
-    if (privateClass.test(line)) {
-      this.processClass("private");
-      return true;
+    if (nameMatch) {
+      const name = nameMatch[0].replace(":", "");
+      if (publicClass.test(line)) {
+        this.processClass("public", name);
+        return true;
+      }
+      if (privateClass.test(line)) {
+        this.processClass("private", name);
+        return true;
+      }
     }
 
     return false;
   }
 
-  static processClass(scope: "public" | "private") {
-    const emshClass = new EmshClass("");
+  static processClass(scope: "public" | "private", name: string) {
+    const emshClass = new EmshClass(name);
+    if (this.currentObject instanceof EmshModule)
+      this.currentObject.addClass(scope, emshClass);
+    this.currentIndex++;
+    this.currentDepth = this.getLineDepth(this.code[this.currentIndex]);
 
     while (this.currentIndex < this.code.length) {
       this.currentObject = emshClass;
@@ -125,17 +154,21 @@ export class CoreTranspiler {
       const line = this.code[this.currentIndex].trim();
       const depth = this.getLineDepth(this.code[this.currentIndex]);
 
-      if (depth < this.currentDepth) break;
+      if (line !== "") {
+        if (depth < this.currentDepth) break;
 
-      if (this.isFunction(line, depth)) continue;
-      if (this.isVariable(line, depth)) continue;
+        if (this.isFunction(line, depth)) continue;
+        if (this.isVariable(line, depth)) continue;
+      }
     }
   }
 
   static isFunction(line: string, depth: number) {
     if (depth !== 1 && depth !== 2)
       throw new Error(
-        `Syntax error at line ${line}: functions can only be defined at module and class level`
+        `Syntax error at line ${this.currentIndex + 1} in ${
+          this.currentName
+        }: functions can only be defined at module and class level`
       );
     return false;
   }
@@ -145,7 +178,9 @@ export class CoreTranspiler {
   static isTimesLoop(line: string, depth: number) {
     if (depth < 3)
       throw new Error(
-        `Syntax error at line ${line}: loops can only be defined at function level and above`
+        `Syntax error at line ${this.currentIndex + 1} in ${
+          this.currentName
+        }: loops can only be defined at function level and above`
       );
     return false;
   }
@@ -155,7 +190,9 @@ export class CoreTranspiler {
   static isForLoop(line: string, depth: number) {
     if (depth < 3)
       throw new Error(
-        `Syntax error at line ${line}: loops can only be defined at function level and above`
+        `Syntax error at line ${this.currentIndex + 1} in ${
+          this.currentName
+        }: loops can only be defined at function level and above`
       );
     return false;
   }
@@ -165,7 +202,9 @@ export class CoreTranspiler {
   static isForInLoop(line: string, depth: number) {
     if (depth < 3)
       throw new Error(
-        `Syntax error at line ${line}: loops can only be defined at function level and above`
+        `Syntax error at line ${this.currentIndex + 1} in ${
+          this.currentName
+        }: loops can only be defined at function level and above`
       );
     return false;
   }
@@ -175,7 +214,9 @@ export class CoreTranspiler {
   static isForOfLoop(line: string, depth: number) {
     if (depth < 3)
       throw new Error(
-        `Syntax error at line ${line}: loops can only be defined at function level and above`
+        `Syntax error at line ${this.currentIndex + 1} in ${
+          this.currentName
+        }: loops can only be defined at function level and above`
       );
     return false;
   }
@@ -185,7 +226,9 @@ export class CoreTranspiler {
   static isWhileLoop(line: string, depth: number) {
     if (depth < 3)
       throw new Error(
-        `Syntax error at line ${line}: loops can only be defined at function level and above`
+        `Syntax error at line ${this.currentIndex + 1} in ${
+          this.currentName
+        }: loops can only be defined at function level and above`
       );
     return false;
   }
@@ -195,7 +238,9 @@ export class CoreTranspiler {
   static isDoWhileLoop(line: string, depth: number) {
     if (depth < 3)
       throw new Error(
-        `Syntax error at line ${line}: loops can only be defined at function level and above`
+        `Syntax error at line ${this.currentIndex + 1} in ${
+          this.currentName
+        }: loops can only be defined at function level and above`
       );
     return false;
   }
@@ -205,7 +250,9 @@ export class CoreTranspiler {
   static isIfStatement(line: string, depth: number) {
     if (depth < 3)
       throw new Error(
-        `Syntax error at line ${line}: conditional statements can only be defined at function level and above`
+        `Syntax error at line ${this.currentIndex + 1} in ${
+          this.currentName
+        }: conditional statements can only be defined at function level and above`
       );
     return false;
   }
@@ -215,7 +262,9 @@ export class CoreTranspiler {
   static isIfElseStatement(line: string, depth: number) {
     if (depth < 3)
       throw new Error(
-        `Syntax error at line ${line}: conditional statements can only be defined at function level and above`
+        `Syntax error at line ${this.currentIndex + 1} in ${
+          this.currentName
+        }: conditional statements can only be defined at function level and above`
       );
     return false;
   }
@@ -225,7 +274,9 @@ export class CoreTranspiler {
   static isElseStatement(line: string, depth: number) {
     if (depth < 3)
       throw new Error(
-        `Syntax error at line ${line}: conditional statements can only be defined at function level and above`
+        `Syntax error at line ${this.currentIndex + 1} in ${
+          this.currentName
+        }: conditional statements can only be defined at function level and above`
       );
     return false;
   }
@@ -252,9 +303,11 @@ export class CoreTranspiler {
 
   static getLineDepth(line: string) {
     let depth = 0;
-    while (line.startsWith("\t")) {
+    console.log(line);
+
+    while (line.startsWith(" ")) {
       depth++;
-      line = line.replace("\t", "");
+      line = line.replace(" ", "");
     }
     return depth;
   }
