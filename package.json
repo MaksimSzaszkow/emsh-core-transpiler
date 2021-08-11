@@ -1,0 +1,28 @@
+{
+  "name": "emsh-core-transpiler",
+  "version": "0.0.1",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "ts-node index.ts",
+    "build": "tsc",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MaksimSzaszkow/emsh-core-transpiler.git"
+  },
+  "author": "Maksim Szaszkow",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/MaksimSzaszkow/emsh-core-transpiler/issues"
+  },
+  "homepage": "https://github.com/MaksimSzaszkow/emsh-core-transpiler#readme",
+  "dependencies": {},
+  "devDependencies": {
+    "@tsconfig/recommended": "^1.0.1",
+    "@types/node": "^16.4.13",
+    "ts-node": "^10.2.0",
+    "typescript": "^4.3.5"
+  }
+}
