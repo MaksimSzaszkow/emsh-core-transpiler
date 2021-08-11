@@ -39,11 +39,7 @@ async function processEmshFile(path: string) {
   try {
     filehandle = await open(path, "r");
     const content = await filehandle.read();
-    console.log(content.buffer.toString());
-    await writeFile(
-      generateEcoPath(path.replace(/.emsh$/, ".eco")),
-      content.buffer
-    );
+    await writeFile(generateEcoPath(path), content.buffer);
   } catch (err) {
     console.log(`Error while accessing path "${path}": ${err}`);
   } finally {
@@ -52,9 +48,12 @@ async function processEmshFile(path: string) {
 }
 
 function generateEcoPath(path: string) {
+  if (path.endsWith(".emsh")) path = path.replace(/.emsh$/, ".eco");
   const pathArr = path.split("/");
   pathArr[0] = "eco";
   return pathArr.join("/");
 }
+
+function createEcoFromEmsh(emsh: string) {}
 
 main();
